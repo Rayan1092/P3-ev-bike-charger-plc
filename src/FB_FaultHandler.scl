@@ -1,0 +1,59 @@
+﻿FUNCTION_BLOCK "FB_FaultHandler"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      processedV : Real;
+      processedTemp : Real;
+      runningTime : Real;
+      processedC : Real;
+      eStop : Bool;
+      targetV : Real;
+      targetC : Real;
+      faultReset : Bool;
+   END_VAR
+
+   VAR_OUTPUT 
+      fault : Bool;
+   END_VAR
+
+   VAR CONSTANT 
+      maxTime : Real := 28800.0;
+   END_VAR
+
+
+BEGIN
+	IF #processedV < #targetV * 1.05 AND #processedTemp < 45.0 AND
+	    #runningTime < #maxTime AND #processedC < #targetC * 1.10 AND
+	    #eStop = FALSE THEN
+	    
+	    #fault := FALSE;
+	END_IF;
+	
+	IF "faultReset" = TRUE THEN
+	    #fault := FALSE;
+	END_IF;
+	
+	IF #processedTemp > 45.0 THEN
+	    #fault := TRUE;
+	END_IF;
+	
+	IF "runningTime" > #maxTime THEN
+	    #fault := TRUE;
+	END_IF;
+	
+	IF #processedC > #targetC * 1.10 THEN
+	    #fault := TRUE;
+	END_IF;
+	
+	IF #processedV > #targetV * 1.05 THEN
+	    #fault := TRUE;
+	END_IF;
+	
+	IF #eStop = TRUE THEN
+	    #fault := TRUE;
+	    "runningTime" := 0;
+	END_IF;
+	
+	
+END_FUNCTION_BLOCK
+

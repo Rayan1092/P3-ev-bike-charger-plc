@@ -1,0 +1,136 @@
+﻿FUNCTION_BLOCK "FB_ChargeControl"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      targetV : Real;
+      targetC : Real;
+      fault : Bool;
+      processedC : Real;
+      processedV : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      pwmVal : Int;
+   END_VAR
+
+   VAR 
+      state : Int := 0;
+      PIDSP : Real;
+      PIDPV : Real;
+      pTerm : Real;
+      iTerm : Real;
+      dTerm : Real;
+      err : Real;
+      correction : Real;
+      preverr : Real;
+      done : Bool;
+      prevstartcmd : Bool;
+      stateText : String;
+      lct : LReal;
+      localRN : LReal;
+      actualDT : LReal;
+   END_VAR
+
+   VAR CONSTANT 
+      "DT" : Real := 0.025;
+      Kp : Real := 5000.0;
+      Ki : Real := 100.0;
+      Kd : Real := 0.0;
+   END_VAR
+
+
+BEGIN
+	IF "startCMD" = TRUE AND #prevstartcmd = FALSE AND #fault = FALSE  AND #state = 0 THEN
+	    #state := 1;
+	END_IF;
+	
+	IF #fault = TRUE THEN
+	    #state := 5;
+	END_IF;
+	
+	#actualDT := RUNTIME(#lct);
+	IF #actualDT < 0.0 THEN
+	    #actualDT := 0.025;
+	END_IF;
+	
+	CASE #state OF
+	        
+	    0:
+	        #stateText := 'IDLE';
+	    1:
+	        #stateText := 'CC';
+	        
+	        #PIDPV := #processedC;
+	        #PIDSP := #targetC;
+	        
+	        IF #processedV >= #targetV THEN
+	            #state := 2;
+	        END_IF;
+	    2:
+	        #stateText := 'CV';
+	        #PIDPV := #processedV;
+	        #PIDSP := #targetV;
+	        
+	        IF #processedC <= 0.1 THEN
+	            #state := 3;
+	        END_IF;
+	    3:
+	        #stateText := 'TRICKLE';
+	        #PIDSP := 0.05 * #targetC;
+	        #PIDPV := #processedC;
+	        
+	        IF #processedV >= #targetV AND #processedC <= 0.05 THEN
+	            #state := 4;
+	        END_IF;
+	    4:
+	        #stateText := 'DONE';
+	        #done := TRUE;
+	        
+	        IF "stopCMD" = TRUE THEN
+	            #done := FALSE;
+	            #state := 0;
+	        END_IF;
+	    5:
+	        #stateText := 'FAULT';
+	        #pwmVal := 0;
+	        
+	        IF #fault = FALSE THEN
+	            #state := 0;
+	        END_IF;
+	        
+	END_CASE;
+	
+	IF #state >= 1 AND #state <= 3 THEN
+	    
+	    #err := #PIDSP - #PIDPV;
+	    
+	    #pTerm := #Kp * #err;
+	    #iTerm := #iTerm + (#Ki * #err * LREAL_TO_REAL(#actualDT));
+	    #dTerm := #Kd * ((#err - #preverr) / LREAL_TO_REAL(#actualDT));
+	    
+	    #correction := #pTerm + #iTerm + #dTerm;
+	    
+	    IF #correction > 27648 THEN
+	        #correction := 27648;
+	    ELSIF #correction < 0 THEN
+	        #correction := 0;
+	    END_IF;
+	    
+	    IF #fault = FALSE THEN
+	        #pwmVal := REAL_TO_INT(#correction);
+	    ELSE
+	        #pwmVal := 0;
+	    END_IF;
+	    #preverr := #err;
+	    
+	END_IF;
+	#localRN := #localRN + #actualDT;
+	"runningTime" := LREAL_TO_INT(#localRN);
+	#prevstartcmd := "startCMD";
+	
+	
+	
+	        
+	        
+END_FUNCTION_BLOCK
+

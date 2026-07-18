@@ -1,0 +1,53 @@
+﻿ORGANIZATION_BLOCK "Main"
+TITLE = "Main Program Sweep (Cycle)"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_TEMP 
+      processedC : Real;
+      processedV : Real;
+      fault : Bool;
+      processedTemp : Real;
+      chargeCurrSP : Real;
+   END_VAR
+
+   VAR CONSTANT 
+      voltageConversionVal : Real := 276.48;
+      currConversionVal : Real := 2764.8;
+      tempConversionVal : Real := 345.6;
+      V_min : Real := 39.0;
+      V_max : Real := 54.6;
+   END_VAR
+
+
+BEGIN
+	#processedC := "chargeCurrSens" / #currConversionVal;
+	#processedV := "batVoltageSensor" / #voltageConversionVal;
+	#processedTemp := "batTempSens" / #tempConversionVal;
+	
+	"socEST":= REAL_TO_INT(((#processedV - #V_min) / (#V_max - #V_min)) * 100);
+	
+	"FB_FaultHandler_DB"(processedV:=#processedV,
+	                     processedTemp:=#processedTemp,
+	                     runningTime:="runningTime",
+	                     processedC:=#processedC,
+	                     "eStop":="eStop",
+	                     "targetV":="targetV",
+	                     "targetC":="targetC",
+	                     "faultReset":="faultReset",
+	                     fault=>#fault);
+	
+	
+	"FB_ThermalDerating_DB"(batteryTemp:=#processedTemp,
+	                        targetC:="targetC",
+	                        chargeCurrSP=>#chargeCurrSP);
+	
+	"FB_ChargeControl_DB"(targetV:="targetV",
+	                      "targetC":=#chargeCurrSP,
+	                      fault:=#fault,
+	                      processedC:=#processedC,
+	                      processedV:=#processedV,
+	                      pwmVal=> "pwmOut");
+	
+	
+END_ORGANIZATION_BLOCK
+

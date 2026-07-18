@@ -1,0 +1,23 @@
+﻿FUNCTION_BLOCK "FB_ThermalDerating"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      batteryTemp : Real;
+      targetC : Real;
+   END_VAR
+
+   VAR_OUTPUT 
+      chargeCurrSP : Real;
+   END_VAR
+
+
+BEGIN
+	IF #batteryTemp < 35.0 THEN
+	    #chargeCurrSP := #targetC;
+	    
+	ELSIF #batteryTemp >= 35.0 AND #batteryTemp <= 45.0 THEN
+	    #chargeCurrSP := #targetC * (1 - (#batteryTemp - 35) / 10);
+	    
+	END_IF;
+END_FUNCTION_BLOCK
+
